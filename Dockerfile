@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     x11-xserver-utils \
     xterm \
     procps \
+    dbus \
     --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -32,30 +33,50 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ── Allow root to login via XRDP ────────────────────────────────────────────
+# ── Set root password ────────────────────────────────────────────────────────
 RUN echo "root:root" | chpasswd
 
-RUN sed -i 's/^allowed_users=.*/allowed_users=anybody/' /etc/X11/Xwrapper.config 2>/dev/null || \
-    echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
+# ── Allow root X11 access ────────────────────────────────────────────────────
+RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
+    echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
 
-# ── XRDP: use Xorg backend, enable root ─────────────────────────────────────
-RUN adduser xrdp ssl-cert 2>/dev/null || true && \
-    sed -i 's/^port=.*/port=3389/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/^#AllowRootLogin.*/AllowRootLogin=true/' /etc/xrdp/sesman.ini && \
-    sed -i 's/^AllowRootLogin=.*/AllowRootLogin=true/' /etc/xrdp/sesman.ini || \
+# ── XRDP: allow root login ───────────────────────────────────────────────────
+RUN adduser xrdp ssl-cert 2>/dev/null || true
+
+# Allow root in sesman
+RUN sed -i 's/^AllowRootLogin=false/AllowRootLogin=true/' /etc/xrdp/sesman.ini && \
+    grep -q "^AllowRootLogin" /etc/xrdp/sesman.ini || \
     echo "AllowRootLogin=true" >> /etc/xrdp/sesman.ini
 
-# ── XFCE4 session for XRDP ──────────────────────────────────────────────────
-RUN echo "startxfce4" > /root/.xsession && chmod +x /root/.xsession
+# Use Xorg (not Xvnc) — more stable
+RUN sed -i 's/^#.*Xorg.*$//' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^port=.*/port=3389/' /etc/xrdp/xrdp.ini
 
-# ── Chromium enterprise policy: pre-install extensions ──────────────────────
-# Extensions installed:
-#   uBlock Origin        (cjpalhdlnbpafiamejdnhcphjbkeiagm)  - ad blocker
-#   Sports Tracker       (install via force-install)
+# ── XFCE4 session — CRITICAL FIX ────────────────────────────────────────────
+# Must use "exec" so session doesn't exit immediately
+RUN echo "#!/bin/bash"                          > /root/.xsession && \
+    echo "export XDG_SESSION_TYPE=x11"         >> /root/.xsession && \
+    echo "export XDG_CURRENT_DESKTOP=XFCE"     >> /root/.xsession && \
+    echo "unset DBUS_SESSION_BUS_ADDRESS"       >> /root/.xsession && \
+    echo "exec startxfce4"                      >> /root/.xsession && \
+    chmod +x /root/.xsession
+
+# Also set for xrdp specifically
+RUN echo "exec startxfce4" > /root/.Xclients && chmod +x /root/.Xclients
+
+# Disable xfce4 first-run wizard so desktop appears immediately
+RUN mkdir -p /root/.config/xfce4 && \
+    mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
+
+RUN echo '[Desktop]'                              > /root/.config/xfce4/desktop.conf && \
+    echo 'session=xfce'                          >> /root/.config/xfce4/desktop.conf
+
+# ── Chromium enterprise policy ───────────────────────────────────────────────
 RUN mkdir -p /etc/chromium/policies/managed
 COPY chromium-policy/managed/policy.json /etc/chromium/policies/managed/policy.json
 
 # ── PulseAudio client config ─────────────────────────────────────────────────
+RUN mkdir -p /root/.config/pulse
 COPY pulse-client.conf /root/.config/pulse/client.conf
 
 # ── Desktop shortcuts ────────────────────────────────────────────────────────
