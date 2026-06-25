@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sports Browser</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #0b0f1a;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #111827;
+      border-bottom: 1px solid #1f2d45;
+      padding: 0 14px;
+      height: 46px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    #logo {
+      font-size: 15px;
+      font-weight: 700;
+      background: linear-gradient(90deg,#3b82f6,#06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+    #urlbar {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: #1a2235;
+      border: 1px solid #1f2d45;
+      border-radius: 999px;
+      padding: 0 14px;
+      height: 32px;
+      gap: 8px;
+    }
+    #urlbar input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: #f1f5f9;
+      font-size: 13px;
+    }
+    #goBtn {
+      background: #3b82f6;
+      border: none;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 14px;
+      cursor: pointer;
+    }
+    .bm {
+      background: none;
+      border: 1px solid #1f2d45;
+      border-radius: 6px;
+      color: #94a3b8;
+      font-size: 12px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .bm:hover { border-color: #3b82f6; color:#f1f5f9; }
+
+    /* ── Canvas area ── */
+    #screen {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    #vnc_canvas, canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* ── Loading overlay ── */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: #0b0f1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      z-index: 5;
+    }
+    #overlay .title {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(90deg,#3b82f6,#06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    #overlay .sub { color: #64748b; font-size: 14px; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #1f2d45;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #status { color: #3b82f6; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar with URL control -->
+<div id="topbar">
+  <div id="logo">⚽ Sports</div>
+
+  <div id="urlbar">
+    <input id="urlInput" type="text" placeholder="Enter URL…" value="https://www.livescore.com"
+      onkeydown="if(event.key==='Enter') navigate()" />
+    <button id="goBtn" onclick="navigate()">Go</button>
+  </div>
+
+  <button class="bm" onclick="navigate('https://www.sofascore.com')">SofaScore</button>
+  <button class="bm" onclick="navigate('https://www.flashscore.com')">FlashScore</button>
+  <button class="bm" onclick="navigate('https://www.espn.com')">ESPN</button>
+  <button class="bm" onclick="navigate('https://www.skysports.com')">Sky Sports</button>
+</div>
+
+<!-- VNC screen area -->
+<div id="screen">
+  <div id="overlay">
+    <div class="title">⚽ Sports Browser</div>
+    <div class="sub">Connecting to Railway server…</div>
+    <div class="spinner"></div>
+    <div id="status">Starting browser on server…</div>
+  </div>
+</div>
+
+<!-- noVNC core -->
+<script type="module">
+  import RFB from '/core/rfb.js';
+
+  const overlay = document.getElementById('overlay');
+  const status  = document.getElementById('status');
+  const screen  = document.getElementById('screen');
+
+  // Connect to VNC via WebSocket (same host, Railway routes it)
+  const host = window.location.hostname;
+  const port = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
+  const path = 'websockify';
+
+  const url = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${host}:${port}/${path}`;
+
+  status.textContent = 'Connecting…';
+
+  let rfb;
+  try {
+    rfb = new RFB(screen, url, {
+      credentials: { password: '' },
+      scaleViewport: true,
+      resizeSession: true,
+    });
+
+    rfb.addEventListener('connect', () => {
+      overlay.style.display = 'none';
+      rfb.scaleViewport = true;
+    });
+
+    rfb.addEventListener('disconnect', (e) => {
+      overlay.style.display = 'flex';
+      status.textContent = 'Disconnected — reconnecting…';
+      setTimeout(() => location.reload(), 3000);
+    });
+
+    rfb.addEventListener('credentialsrequired', () => {
+      rfb.sendCredentials({ password: '' });
+    });
+
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+
+  // ── Navigate (send URL to Chromium via address bar simulation) ──────────
+  window.navigate = function(url) {
+    const input = document.getElementById('urlInput');
+    if (url) input.value = url;
+    let val = input.value.trim();
+    if (!val) return;
+    if (!val.startsWith('http://') && !val.startsWith('https://')) {
+      val = val.includes('.') ? 'https://' + val
+        : 'https://www.google.com/search?q=' + encodeURIComponent(val);
+    }
+    input.value = val;
+    // Send Ctrl+L to focus Chromium address bar, then type URL
+    if (rfb) {
+      rfb.sendKey(0xFFE3, 'ControlLeft', true);   // Ctrl down
+      rfb.sendKey(0x006C, 'KeyL', true);           // L down
+      rfb.sendKey(0x006C, 'KeyL', false);          // L up
+      rfb.sendKey(0xFFE3, 'ControlLeft', false);   // Ctrl up
+      setTimeout(() => {
+        // Type the URL
+        for (const ch of val) {
+          rfb.sendKey(ch.codePointAt(0));
+        }
+        // Press Enter
+        rfb.sendKey(0xFF0D, 'Enter', true);
+        rfb.sendKey(0xFF0D, 'Enter', false);
+      }, 300);
+    }
+  };
+</script>
+
+</body>
+</html>
