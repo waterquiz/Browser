@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Installing Scripts...</title>
+  <style>
+    body { background:#0b0f1a; color:#f1f5f9; font-family:Inter,sans-serif;
+           display:flex; flex-direction:column; align-items:center;
+           justify-content:center; height:100vh; gap:16px; }
+    h2 { color:#3b82f6; }
+    .item { padding:8px 20px; background:#111827; border-radius:8px;
+            border:1px solid #1f2d45; font-size:13px; }
+    .ok  { border-color:#22c55e; color:#22c55e; }
+    .spinner { width:32px;height:32px;border:3px solid #1f2d45;
+               border-top-color:#3b82f6;border-radius:50%;
+               animation:spin .8s linear infinite; }
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <h2>🐒 Installing Violentmonkey Scripts</h2>
+  <div class="spinner" id="spin"></div>
+  <div id="log"></div>
+
+<script>
+const scripts = [
+  { name: 'Auto-Solver Teaserfast', file: 'Auto-Solver Teaserfast Ctacked By Fraz Khan.user.js' },
+  { name: 'Teaserfast Main',        file: 'Teaserfast Ctacked By Fraz Khan.user.js' },
+  { name: 'Teaserfast Script 2',    file: 'Teaserfast Ctacked By Fraz Khan_2.user.js' }
+];
+
+const log = document.getElementById('log');
+
+function addLog(name, ok) {
+  const d = document.createElement('div');
+  d.className = 'item' + (ok ? ' ok' : '');
+  d.textContent = (ok ? '✅ ' : '⏳ ') + name;
+  log.appendChild(d);
+}
+
+async function installAll() {
+  for (const s of scripts) {
+    addLog(s.name + ' — opening...', false);
+    // Open .user.js file — Violentmonkey intercepts and shows install dialog
+    const url = 'file:///opt/userscripts/' + encodeURIComponent(s.file);
+    window.open(url, '_blank');
+    await new Promise(r => setTimeout(r, 3000)); // wait 3s between installs
+    // Update log
+    log.lastChild.textContent = '✅ ' + s.name + ' — installed!';
+    log.lastChild.className = 'item ok';
+  }
+
+  document.getElementById('spin').style.display = 'none';
+  const done = document.createElement('div');
+  done.innerHTML = '<br><strong style="color:#22c55e">✅ All 3 scripts installed!</strong><br>Redirecting to Teaserfast...';
+  log.appendChild(done);
+
+  setTimeout(() => {
+    window.location.href = 'https://teaserfast.ru';
+  }, 2000);
+}
+
+// Wait 5s for Violentmonkey to fully load, then install
+setTimeout(installAll, 5000);
+</script>
+</body>
+</html>

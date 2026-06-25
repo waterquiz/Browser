@@ -41,7 +41,20 @@ x11vnc \
 sleep 1
 echo "[OK] VNC server started"
 
-# ── Launch Chromium with Violentmonkey extension ────────────────────────────
+# ── Launch Chromium with Violentmonkey + auto-install userscripts ─────────────
+# First launch: open autoinstall page so VM installs the 3 scripts
+# After install it auto-redirects to teaserfast.ru
+
+FIRST_RUN_FLAG="/root/.config/chromium/.scripts_installed"
+
+if [ ! -f "$FIRST_RUN_FLAG" ]; then
+    OPEN_URL="file:///opt/vm-autoinstall.html"
+    echo "[VM] First run — installing userscripts..."
+else
+    OPEN_URL="${START_URL:-https://teaserfast.ru}"
+    echo "[VM] Scripts already installed — opening ${OPEN_URL}"
+fi
+
 DISPLAY=:1 chromium \
     --no-sandbox \
     --disable-gpu \
@@ -55,10 +68,15 @@ DISPLAY=:1 chromium \
     --disable-infobars \
     --load-extension=/opt/extensions/violentmonkey \
     --user-data-dir=/root/.config/chromium \
-    "${START_URL}" \
+    --allow-file-access-from-files \
+    --allow-file-access \
+    "${OPEN_URL}" \
     &
 sleep 3
-echo "[OK] Chromium launched -> ${START_URL}"
+
+# Mark scripts as installed after first run
+touch "$FIRST_RUN_FLAG"
+echo "[OK] Chromium launched -> ${OPEN_URL}"
 
 # ── Start noVNC (HTTP WebSocket bridge → user's browser) ─────────────────────
 echo ""

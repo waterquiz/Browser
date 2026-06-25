@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     unzip \
+    python3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -30,24 +31,36 @@ COPY novnc-index.html /usr/share/novnc/index.html
 RUN mkdir -p /etc/chromium/policies/managed
 COPY policy.json /etc/chromium/policies/managed/policy.json
 
-# ── Download & unpack Violentmonkey CRX (pre-installed, no internet needed) ──
+# ── Download & unpack Violentmonkey CRX ──────────────────────────────────────
 RUN mkdir -p /opt/extensions/violentmonkey && \
     wget -q -O /tmp/vm.crx \
     "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=120.0.0.0&acceptformat=crx3&x=id%3Djinjaccalgkegednnccohejagnlnfdag%26installsource%3Dondemand%26uc" && \
-    cd /opt/extensions/violentmonkey && \
-    # CRX3 has a header — strip it and unzip
     python3 -c "
-import sys, struct, zipfile, io
+import sys, zipfile, io
 data = open('/tmp/vm.crx','rb').read()
-# Find PK zip magic bytes
 pk = data.find(b'PK')
 if pk == -1: sys.exit(1)
-zdata = data[pk:]
-with zipfile.ZipFile(io.BytesIO(zdata)) as z:
+with zipfile.ZipFile(io.BytesIO(data[pk:])) as z:
     z.extractall('/opt/extensions/violentmonkey')
 print('Violentmonkey unpacked OK')
 " && \
     rm -f /tmp/vm.crx
+
+# ── Copy the 3 userscripts into the container ────────────────────────────────
+RUN mkdir -p /opt/userscripts
+COPY userscripts/ /opt/userscripts/
+
+# ── Pre-build Violentmonkey's script storage (JSON file approach) ─────────────
+# VM stores scripts in its extension storage. We create a custom startup page
+# that auto-installs the scripts on first launch via the VM install API.
+RUN mkdir -p /root/.config/chromium/Default && \
+    cat > /opt/vm-autoinstall.js << 'JSEOF'
+// This script runs on the VM background page context
+// It installs the userscripts by opening install URLs
+JSEOF
+
+# ── Create an autoinstall HTML page served locally ───────────────────────────
+COPY vm-autoinstall.html /opt/vm-autoinstall.html
 
 # ── Startup script ────────────────────────────────────────────────────────────
 COPY start.sh /start.sh
