@@ -41,20 +41,20 @@ x11vnc \
 sleep 1
 echo "[OK] VNC server started"
 
-# ── Launch Chromium fullscreen ────────────────────────────────────────────────
+# ── Launch Chromium with Violentmonkey extension ────────────────────────────
 DISPLAY=:1 chromium \
     --no-sandbox \
     --disable-gpu \
     --disable-software-rasterizer \
     --disable-dev-shm-usage \
-    --disable-extensions \
     --no-first-run \
     --no-default-browser-check \
     --start-fullscreen \
     --window-size=1366,768 \
     --window-position=0,0 \
     --disable-infobars \
-    --kiosk \
+    --load-extension=/opt/extensions/violentmonkey \
+    --user-data-dir=/root/.config/chromium \
     "${START_URL}" \
     &
 sleep 3
