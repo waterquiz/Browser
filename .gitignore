@@ -1,0 +1,7 @@
+# Git ignore for Docker project
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.env
+.env.*

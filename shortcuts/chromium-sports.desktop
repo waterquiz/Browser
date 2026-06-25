@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sports Browser
+Comment=Chromium with Sports Sites
+Exec=chromium --no-sandbox --disable-gpu --disable-software-rasterizer --start-maximized https://www.livescore.com
+Icon=chromium
+Terminal=false
+StartupNotify=true
+Categories=Network;WebBrowser;Sports;
