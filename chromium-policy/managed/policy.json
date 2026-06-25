@@ -1,24 +1,20 @@
 {
   "ExtensionInstallForcelist": [
-    "cjpalhdlnbpafiamejdnhcphjbkeiagm;https://clients2.google.com/service/update2/crx",
-    "hlepfoohegkhhmjieoechaddaejaokhf;https://clients2.google.com/service/update2/crx"
+    "cjpalhdlnbpafiamejdnhcphjbkeiagm;https://clients2.google.com/service/update2/crx"
   ],
   "ExtensionInstallAllowlist": [
-    "cjpalhdlnbpafiamejdnhcphjbkeiagm",
-    "hlepfoohegkhhmjieoechaddaejaokhf"
+    "cjpalhdlnbpafiamejdnhcphjbkeiagm"
   ],
   "HomepageLocation": "https://www.livescore.com",
   "HomepageIsNewTabPage": false,
   "RestoreOnStartup": 4,
   "RestoreOnStartupURLs": [
-    "https://www.livescore.com",
-    "https://www.sofascore.com",
-    "https://www.flashscore.com"
+    "https://www.livescore.com"
   ],
   "BookmarkBarEnabled": true,
   "ManagedBookmarks": [
     {
-      "name": "Sports",
+      "name": "⚽ Sports",
       "children": [
         { "name": "LiveScore", "url": "https://www.livescore.com" },
         { "name": "SofaScore", "url": "https://www.sofascore.com" },
@@ -31,11 +27,7 @@
       ]
     }
   ],
-  "DefaultBrowserSettingEnabled": false,
   "MetricsReportingEnabled": false,
-  "AutofillAddressEnabled": false,
-  "PasswordManagerEnabled": false,
-  "SafeBrowsingEnabled": true,
   "PromotionalTabsEnabled": false,
-  "NewTabPageLocation": "https://www.livescore.com"
+  "DefaultBrowserSettingEnabled": false
 }

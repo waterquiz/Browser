@@ -1,43 +1,47 @@
-# Debian XRDP — Sports Browser Edition 🏆
+# 🖥️ Browser Desktop — noVNC Sports Edition
 
-A Dockerized **Debian Bullseye** desktop with XRDP remote access and **Chromium** browser pre-configured with sports sites.
+A **lightweight** Debian Bookworm + XFCE4 desktop that opens directly in your **web browser** — no RDP client needed!
 
-## Features
-- 🖥️ Full XFCE4 desktop via RDP (port 3389)
-- 🌐 **Chromium** (lightest browser with extension support)
-- ⚽ Sports bookmarks: LiveScore, SofaScore, FlashScore, ESPN, BBC Sport, Sky Sports
-- 🛡️ uBlock Origin pre-installed via policy
-- 📌 Homepage: LiveScore.com
+## ✨ Features
 
-## Quick Connect (after Railway deploy)
+| Feature | Detail |
+|---------|--------|
+| 🖥️ Desktop | Debian Bookworm + XFCE4 (minimal) |
+| 🌐 Browser-based | noVNC — opens in any browser tab |
+| ⚡ Single HTTP port | Railway-ready (`$PORT` auto-detected) |
+| 🔐 Password protected | Default: `debian` |
+| ⚽ Sports pre-loaded | Chromium opens LiveScore on startup |
+| 📌 Sports bookmarks | LiveScore, SofaScore, ESPN, BBC Sport, Sky Sports... |
+| 🛡️ Ad blocker | uBlock Origin pre-installed |
 
-Open **Windows Remote Desktop** (Win+R → `mstsc`):
-```
-Computer: YOUR_RAILWAY_HOST:PORT
-Username: root
-Password: root
-```
+## 🚀 Deploy on Railway
 
-## Deploy to Railway
+1. Push this repo to GitHub
+2. [railway.com](https://railway.com) → **New Project** → **Deploy from GitHub Repo**
+3. Select this repo — Railway auto-detects `Dockerfile`
+4. Railway generates a public `*.up.railway.app` URL
+5. Open that URL → click **Connect** → password: `debian`
 
-1. Fork or push this repo to your GitHub
-2. Go to [railway.com](https://railway.com) → **New Project** → **Deploy from GitHub Repo**
-3. Select this repo — Railway auto-detects the Dockerfile
-4. In **Settings → Networking** → Add **TCP Proxy** → Port **3389**
-5. Wait for build (~3–5 min), then connect via RDP!
-
-## Local Test (Docker)
+## 🐳 Local Docker
 
 ```bash
-docker build -t sports-xrdp .
-docker run -d -p 3389:3389 --name sports-xrdp sports-xrdp
-# Connect: mstsc /v:localhost:3389
+docker build -t browser-desktop .
+docker run -d -p 6080:6080 browser-desktop
 ```
+Open **http://localhost:6080** → Connect → password: `debian`
 
-## Credentials
-| Field    | Value  |
-|----------|--------|
-| Username | root   |
-| Password | root   |
+## ⚙️ Environment Variables
 
-> ⚠️ Change the password in Dockerfile for production use.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VNC_PASSWORD` | `debian` | Password for noVNC |
+| `RESOLUTION` | `1280x720x24` | Screen resolution |
+| `PORT` | `6080` | HTTP port (Railway sets automatically) |
+| `VNC_PORT` | `5900` | Internal VNC port |
+
+## Change Password (Railway Dashboard)
+
+In Railway → your service → **Variables** → Add:
+```
+VNC_PASSWORD = yourpassword
+```

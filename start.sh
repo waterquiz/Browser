@@ -1,59 +1,89 @@
 #!/bin/bash
 set -e
 
-echo "============================================"
-echo "  Debian XRDP Container Starting..."
-echo "============================================"
+echo "================================================"
+echo "  🖥️  Browser Desktop — noVNC Edition"
+echo "================================================"
 
-# ── Fix /tmp permissions ──────────────────────────────────────────────────────
+# ── Use Railway's injected PORT, fallback to 6080 ────────────────────────────
+HTTP_PORT="${PORT:-6080}"
+VNC_PORT="${VNC_PORT:-5900}"
+RESOLUTION="${RESOLUTION:-1280x720x24}"
+VNC_PASSWORD="${VNC_PASSWORD:-debian}"
+
+echo "  HTTP Port  : $HTTP_PORT"
+echo "  VNC Port   : $VNC_PORT"
+echo "  Resolution : $RESOLUTION"
+echo "================================================"
+
+# ── Fix tmp permissions ───────────────────────────────────────────────────────
 mkdir -p /tmp/.X11-unix
 chmod 1777 /tmp/.X11-unix
+
+# ── Start D-Bus ───────────────────────────────────────────────────────────────
 mkdir -p /run/dbus
-chmod 755 /run/dbus
+dbus-daemon --system --fork 2>/dev/null || true
+sleep 1
 
-# ── Start D-Bus system bus ────────────────────────────────────────────────────
-if [ ! -f /run/dbus/pid ]; then
-    dbus-daemon --system --fork --print-pid > /run/dbus/pid 2>/dev/null || true
-    sleep 1
-    echo "[OK] D-Bus started"
-else
-    echo "[OK] D-Bus already running"
-fi
-
-# ── Fix XRDP RSA keys ─────────────────────────────────────────────────────────
-if [ ! -f /etc/xrdp/rsakeys.ini ]; then
-    xrdp-keygen xrdp auto 2>/dev/null || true
-    echo "[OK] XRDP keys generated"
-fi
-
-# ── Fix /var/run/xrdp ─────────────────────────────────────────────────────────
-mkdir -p /var/run/xrdp
-chmod 755 /var/run/xrdp
-
-# ── Start XRDP sesman (session manager) first ────────────────────────────────
-/usr/sbin/xrdp-sesman --nodaemon &
+# ── Start Xvfb (virtual display) ─────────────────────────────────────────────
+Xvfb :1 -screen 0 ${RESOLUTION} -ac +extension GLX +render -noreset &
+XVFB_PID=$!
 sleep 2
-echo "[OK] XRDP sesman started"
+echo "[OK] Xvfb started (DISPLAY=:1)"
 
-# ── Start XRDP ────────────────────────────────────────────────────────────────
-/usr/sbin/xrdp --nodaemon &
+# ── Set up VNC password ───────────────────────────────────────────────────────
+mkdir -p ~/.vnc
+x11vnc -storepasswd "${VNC_PASSWORD}" ~/.vnc/passwd
+echo "[OK] VNC password set"
+
+# ── Start x11vnc (VNC server) ─────────────────────────────────────────────────
+x11vnc \
+    -display :1 \
+    -rfbauth ~/.vnc/passwd \
+    -rfbport ${VNC_PORT} \
+    -forever \
+    -shared \
+    -noxdamage \
+    -noxfixes \
+    -noxrecord \
+    -nocursor \
+    -quiet \
+    -bg
+sleep 1
+echo "[OK] x11vnc started on port ${VNC_PORT}"
+
+# ── Start XFCE4 desktop ───────────────────────────────────────────────────────
+DISPLAY=:1 startxfce4 &
+XFCE_PID=$!
+sleep 3
+echo "[OK] XFCE4 started"
+
+# ── Set wallpaper / basic XFCE settings ──────────────────────────────────────
+DISPLAY=:1 xsetroot -solid "#1a1a2e" 2>/dev/null || true
+
+# ── Auto-launch Chromium on startup ──────────────────────────────────────────
 sleep 2
-echo "[OK] XRDP started on port 3389"
+DISPLAY=:1 chromium \
+    --no-sandbox \
+    --disable-gpu \
+    --disable-software-rasterizer \
+    --disable-dev-shm-usage \
+    --no-first-run \
+    --no-default-browser-check \
+    --start-maximized \
+    https://www.livescore.com &
+echo "[OK] Chromium launched → LiveScore"
 
-# ── Start PulseAudio ──────────────────────────────────────────────────────────
-pulseaudio --start \
-    --exit-idle-time=-1 \
-    --disallow-exit \
-    --disable-shm 2>/dev/null || \
-    echo "[WARN] PulseAudio start failed (non-fatal)"
-
+# ── Start noVNC / websockify (HTTP → VNC bridge) ─────────────────────────────
 echo ""
-echo "============================================"
-echo "  RDP ready — connect on port 3389"
-echo "  Username: root"
-echo "  Password: root"
-echo "  Session:  Xorg  <-- select this in login!"
-echo "============================================"
+echo "================================================"
+echo "  ✅ Desktop ready!"
+echo "  Open in browser: http://YOUR_URL:${HTTP_PORT}"
+echo "  Password: ${VNC_PASSWORD}"
+echo "================================================"
 
-# ── Keep container alive ──────────────────────────────────────────────────────
-wait
+websockify \
+    --web=/usr/share/novnc \
+    --heartbeat=30 \
+    ${HTTP_PORT} \
+    localhost:${VNC_PORT}

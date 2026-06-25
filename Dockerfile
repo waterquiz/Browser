@@ -1,93 +1,73 @@
-FROM debian:bullseye
+FROM debian:bookworm-slim
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV USER=root
-ENV HOME=/root
+LABEL maintainer="waterquiz"
+LABEL description="Lightweight Debian XFCE desktop in browser via noVNC"
 
-# ── System base ─────────────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y \
-    xrdp \
+ENV DEBIAN_FRONTEND=noninteractive \
+    VNC_PASSWORD=debian \
+    RESOLUTION=1280x720x24 \
+    VNC_PORT=5900 \
+    DISPLAY=:1 \
+    HOME=/root \
+    USER=root
+
+# ── Single-layer install (faster builds, smaller image) ──────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Virtual display
+    xvfb \
+    # VNC server (lightweight)
+    x11vnc \
+    # Minimal XFCE desktop
     xfce4 \
-    xfce4-goodies \
-    xorg \
+    xfce4-terminal \
+    xfwm4 \
+    xfdesktop4 \
+    # noVNC + websocket proxy
+    novnc \
+    websockify \
+    # Process supervisor
+    supervisor \
+    # X11 utils
     dbus-x11 \
-    sudo \
+    x11-xserver-utils \
+    x11-utils \
+    # Tools
     curl \
     wget \
     nano \
-    net-tools \
-    policykit-1 \
-    pulseaudio \
-    pulseaudio-utils \
-    x11-xserver-utils \
-    xterm \
     procps \
-    dbus \
-    --no-install-recommends && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# ── Chromium (lightest browser with extension support) ───────────────────────
-RUN apt-get update && apt-get install -y \
+    # Chromium browser
     chromium \
-    chromium-sandbox \
-    --no-install-recommends && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# ── Set root password ────────────────────────────────────────────────────────
-RUN echo "root:root" | chpasswd
+# ── noVNC: point root to the noVNC web UI ────────────────────────────────────
+RUN ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html
 
-# ── Allow root X11 access ────────────────────────────────────────────────────
-RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
-    echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
+# ── XFCE4 autostart: disable first-run wizard ────────────────────────────────
+RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml \
+             /root/.config/autostart \
+             /root/Desktop
 
-# ── XRDP: allow root login ───────────────────────────────────────────────────
-RUN adduser xrdp ssl-cert 2>/dev/null || true
+# Skip XFCE first-run / welcome screens
+RUN echo '[Desktop Entry]'                              > /root/.config/autostart/skip-welcome.desktop && \
+    echo 'Hidden=true'                                 >> /root/.config/autostart/skip-welcome.desktop
 
-# Allow root in sesman
-RUN sed -i 's/^AllowRootLogin=false/AllowRootLogin=true/' /etc/xrdp/sesman.ini && \
-    grep -q "^AllowRootLogin" /etc/xrdp/sesman.ini || \
-    echo "AllowRootLogin=true" >> /etc/xrdp/sesman.ini
-
-# Use Xorg (not Xvnc) — more stable
-RUN sed -i 's/^#.*Xorg.*$//' /etc/xrdp/xrdp.ini || true && \
-    sed -i 's/^port=.*/port=3389/' /etc/xrdp/xrdp.ini
-
-# ── XFCE4 session — CRITICAL FIX ────────────────────────────────────────────
-# Must use "exec" so session doesn't exit immediately
-RUN echo "#!/bin/bash"                          > /root/.xsession && \
-    echo "export XDG_SESSION_TYPE=x11"         >> /root/.xsession && \
-    echo "export XDG_CURRENT_DESKTOP=XFCE"     >> /root/.xsession && \
-    echo "unset DBUS_SESSION_BUS_ADDRESS"       >> /root/.xsession && \
-    echo "exec startxfce4"                      >> /root/.xsession && \
-    chmod +x /root/.xsession
-
-# Also set for xrdp specifically
-RUN echo "exec startxfce4" > /root/.Xclients && chmod +x /root/.Xclients
-
-# Disable xfce4 first-run wizard so desktop appears immediately
-RUN mkdir -p /root/.config/xfce4 && \
-    mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
-
-RUN echo '[Desktop]'                              > /root/.config/xfce4/desktop.conf && \
-    echo 'session=xfce'                          >> /root/.config/xfce4/desktop.conf
-
-# ── Chromium enterprise policy ───────────────────────────────────────────────
+# ── Chromium policy: sports sites + uBlock Origin ────────────────────────────
 RUN mkdir -p /etc/chromium/policies/managed
 COPY chromium-policy/managed/policy.json /etc/chromium/policies/managed/policy.json
 
-# ── PulseAudio client config ─────────────────────────────────────────────────
-RUN mkdir -p /root/.config/pulse
-COPY pulse-client.conf /root/.config/pulse/client.conf
-
-# ── Desktop shortcuts ────────────────────────────────────────────────────────
-RUN mkdir -p /root/Desktop
+# ── Desktop shortcut: Sports Browser ─────────────────────────────────────────
 COPY shortcuts/chromium-sports.desktop /root/Desktop/chromium-sports.desktop
 RUN chmod +x /root/Desktop/chromium-sports.desktop
 
-# ── Startup script ───────────────────────────────────────────────────────────
+# ── Supervisor config: manages all processes ──────────────────────────────────
+COPY supervisord.conf /etc/supervisor/conf.d/desktop.conf
+
+# ── Startup script ────────────────────────────────────────────────────────────
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-EXPOSE 3389
+EXPOSE 6080
 
 CMD ["/start.sh"]
